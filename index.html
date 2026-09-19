@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>畢業拍照 · 時段預約</title>
+<meta name="description" content="畢業拍照時段報名系統，每時段限額 25 人，額滿即自動關閉。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%93%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    box-sizing:border-box;
+    --bg:#101B33; --bg-panel:#17244A;
+    --gold:#C79A3E; --gold-deep:#9C7726;
+    --ink-on-navy:#F3EEDD; --ink-muted:#9AA6C6;
+    --success-bg:rgba(76,135,103,0.16); --error:#C0523C; --error-bg:rgba(192,82,60,0.16);
+    --divider:rgba(255,255,255,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink-on-navy);
+    font-family:'Noto Sans TC', system-ui, sans-serif; line-height:1.6;
+  }
+  a{color:inherit;}
+  .wrap{max-width:720px; margin:0 auto; padding:48px 20px 80px;}
+  header.hero{margin-bottom:36px;}
+  .eyebrow{font-size:0.8rem; color:var(--gold); margin:0 0 10px; font-weight:500;}
+  h1{font-family:'Noto Serif TC', serif; font-weight:700; font-size:clamp(1.9rem,5vw,2.6rem); margin:0 0 14px; line-height:1.3;}
+  .lede{color:var(--ink-muted); font-size:1rem; max-width:56ch; margin:0 0 18px;}
+  .rules{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; padding:16px; background:var(--bg-panel); border-radius:12px; border:1px solid var(--divider);}
+  .rules div{font-size:0.86rem; color:var(--ink-muted);}
+  .rules strong{display:block; color:var(--ink-on-navy); font-size:1rem; margin-bottom:2px;}
+
+  #status-message{display:none; margin:20px 0; padding:12px 16px; border-radius:10px; font-size:0.92rem;}
+  #status-message.is-visible{display:block;}
+  #status-message.type-error{background:var(--error-bg); color:#F4C9BE; border:1px solid rgba(192,82,60,0.4);}
+  #status-message.type-success{background:var(--success-bg); color:#CFE9D9; border:1px solid rgba(76,135,103,0.4);}
+  #status-message.type-info{background:rgba(199,154,62,0.14); color:#F1DCA6; border:1px solid rgba(199,154,62,0.4);}
+
+  #my-status{display:none; margin:0 0 20px; padding:10px 14px; background:rgba(199,154,62,0.12); border:1px dashed var(--gold); border-radius:10px; font-size:0.88rem; color:#F1DCA6;}
+  #my-status.is-visible{display:block;}
+
+  section.card{background:var(--bg-panel); border:1px solid var(--divider); border-radius:14px; padding:20px; margin-bottom:28px;}
+  section.card h2{font-family:'Noto Serif TC', serif; font-size:1.15rem; margin:0 0 14px; font-weight:600;}
+  .field{margin-bottom:14px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{display:block; font-size:0.84rem; color:var(--ink-muted); margin-bottom:6px;}
+  .field input, .field select{
+    width:100%; padding:11px 13px; border-radius:9px; border:1px solid var(--divider);
+    background:rgba(255,255,255,0.04); color:var(--ink-on-navy); font-size:1rem; font-family:inherit;
+  }
+  .field select{
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23C79A3E'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%23C79A3E' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 13px center; padding-right:36px;
+  }
+  .field select:disabled, .field input:disabled{opacity:0.5; cursor:not-allowed;}
+  .field input::placeholder{color:rgba(243,238,221,0.35);}
+  .field input:focus, .field select:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
+
+  h2.section-title{font-family:'Noto Serif TC', serif; font-size:1.2rem; margin:0 0 16px; font-weight:600;}
+  .slot-names-preview{font-size:0.84rem; color:var(--ink-muted); margin:-4px 0 16px; min-height:1.2em;}
+  .no-dates-message{padding:20px 18px; border-radius:12px; border:1px dashed var(--divider); background:var(--bg-panel); color:var(--ink-muted); font-size:0.94rem; line-height:1.6;}
+
+  .btn{font-family:inherit; font-size:0.96rem; font-weight:600; padding:11px 20px; border-radius:9px; border:none; cursor:pointer; transition:background .15s ease;}
+  .btn:disabled{opacity:0.5; cursor:not-allowed;}
+  .btn-primary{background:var(--gold); color:#1B2542;}
+  .btn-primary:hover:not(:disabled){background:var(--gold-deep); color:var(--ink-on-navy);}
+  .btn-block{width:100%;}
+  .btn-danger{background:transparent; color:var(--error); border:1px solid var(--error); margin-bottom:16px;}
+  .btn-link-danger{background:none; color:var(--error); border:none; padding:4px 8px; font-size:0.84rem; text-decoration:underline; cursor:pointer;}
+
+  .admin-toggle-link{font-size:0.8rem; color:var(--ink-muted); text-decoration:underline; cursor:pointer; background:none; border:none; padding:0;}
+  #admin-login{margin-top:40px;}
+  #admin-panel{display:none; margin-top:20px;}
+  #admin-panel.is-visible{display:block;}
+  .admin-date-list{list-style:none; margin:0 0 20px; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .admin-date-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.03); border:1px solid var(--divider); border-radius:10px;}
+  .admin-date-row .admin-date-row-label{font-weight:600;}
+  .admin-date-row .admin-date-row-meta{font-size:0.8rem; color:var(--ink-muted);}
+  .admin-stats{color:var(--ink-muted); font-size:0.92rem; margin:0 0 16px;}
+  table.admin-table{width:100%; border-collapse:collapse; font-size:0.86rem;}
+  table.admin-table th, table.admin-table td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--divider); white-space:nowrap;}
+  table.admin-table th{color:var(--ink-muted); font-weight:500;}
+  .admin-table-wrap{overflow-x:auto;}
+
+  footer{margin-top:48px; font-size:0.8rem; color:var(--ink-muted); text-align:center;}
+
+  @media (max-width:480px){ .wrap{padding:32px 16px 56px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">畢業拍照報名</p>
+    <h1>選一個你方便的拍照時段</h1>
+    <p class="lede">每個時段限額 25 人，額滿即自動關閉；每人只能預約一次，送出後無法自行更改，請確認清楚再送出。</p>
+    <div class="rules">
+      <div><strong>09:00–12:00</strong>上午時段</div>
+      <div><strong>12:00–13:00</strong>休息，不開放</div>
+      <div><strong>13:00–18:00</strong>下午時段</div>
+      <div><strong>每時段 25 人</strong>額滿關閉</div>
+    </div>
+  </header>
+
+  <div id="status-message"></div>
+  <div id="my-status"></div>
+
+  <section class="card">
+    <h2>你的報名資料</h2>
+    <div class="field">
+      <label for="f-class">班級</label>
+      <input type="text" id="f-class" placeholder="例：資通3B" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="f-id">學號</label>
+      <input type="text" id="f-id" placeholder="例：11200000" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="f-name">姓名</label>
+      <input type="text" id="f-name" placeholder="例：王曉明" autocomplete="name">
+    </div>
+    <div class="field">
+      <label for="f-phone">聯絡電話</label>
+      <input type="tel" id="f-phone" placeholder="例：0912345678" autocomplete="tel">
+    </div>
+  </section>
+
+  <h2 class="section-title">選擇時段</h2>
+  <div id="no-dates-notice" class="no-dates-message" style="display:none"></div>
+  <section class="card" id="picker-section">
+    <div class="field">
+      <label for="f-date">日期</label>
+      <select id="f-date"></select>
+    </div>
+    <div class="field">
+      <label for="f-slot">時段</label>
+      <select id="f-slot"></select>
+    </div>
+    <div id="slot-names-preview" class="slot-names-preview"></div>
+    <button type="button" class="btn btn-primary btn-block" id="submit-btn">確認預約這個時段</button>
+  </section>
+
+  <button type="button" class="admin-toggle-link" id="admin-toggle-link">管理者登入</button>
+  <section class="card" id="admin-login" style="display:none">
+    <h2>管理者登入</h2>
+    <div class="field">
+      <label for="admin-key-input">管理密碼</label>
+      <input type="password" id="admin-key-input" placeholder="輸入管理密碼">
+    </div>
+    <button type="button" class="btn btn-primary" id="admin-login-btn">登入</button>
+  </section>
+
+  <div id="admin-panel"></div>
+
+  <footer>如發現時段資訊有誤，請聯絡負責報名的同學協助處理。</footer>
+</div>
+
+<script>
+'use strict';
+
+// ⚠️ 部署 Apps Script 後，把下面換成你自己的「網頁應用程式」網址（結尾是 /exec）
+var API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+var appState = { dates: [] };
+var selectedDateId = null;
+var selectedSlotId = null;
+var submitting = false;
+var adminKey = null;
+var adminData = null;
+
+function $(id){ return document.getElementById(id); }
+
+function showMessage(type, text){
+  var el = $('status-message');
+  el.className = 'is-visible type-' + type;
+  el.textContent = text;
+}
+function clearMessage(){
+  var el = $('status-message');
+  el.className = '';
+  el.textContent = '';
+}
+
+function findDateObj(dateId){
+  return appState.dates.find(function(d){ return d.id === dateId; }) || null;
+}
+function findSlotObj(dateObj, slotId){
+  if (!dateObj) return null;
+  return dateObj.slots.find(function(s){ return s.id === slotId; }) || null;
+}
+function fmtRange(slot){ return slot.start + ' - ' + slot.end; }
+
+async function apiGet(){
+  var res = await fetch(API_URL, { method: 'GET' });
+  return res.json();
+}
+async function apiPost(payload){
+  var res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+async function loadState(){
+  try {
+    var data = await apiGet();
+    if (!data || data.ok === false){
+      showMessage('error', '無法讀取報名資料，請稍後再試。');
+      return;
+    }
+    appState = data;
+    renderPicker();
+    renderMyStatus();
+  } catch (e){
+    showMessage('error', '無法連線到報名系統，請確認網路連線，或稍後再試一次。');
+  }
+}
+
+function renderPicker(){
+  var notice = $('no-dates-notice');
+  var section = $('picker-section');
+  var dateSel = $('f-date');
+
+  if (!appState.dates || !appState.dates.length){
+    notice.style.display = 'block';
+    notice.textContent = '報名時段尚未開放，日期確定後會公佈在這裡，請留意後續通知。';
+    section.style.display = 'none';
+    return;
+  }
+  notice.style.display = 'none';
+  section.style.display = '';
+
+  var disabled = submitting;
+  dateSel.disabled = disabled;
+  dateSel.innerHTML = '';
+  var ph = document.createElement('option');
+  ph.value = ''; ph.textContent = '請選擇日期';
+  dateSel.appendChild(ph);
+  appState.dates.forEach(function(d){
+    var opt = document.createElement('option');
+    opt.value = d.id; opt.textContent = d.label;
+    dateSel.appendChild(opt);
+  });
+  if (selectedDateId && findDateObj(selectedDateId)){
+    dateSel.value = selectedDateId;
+  } else {
+    dateSel.value = '';
+    selectedDateId = null;
+    selectedSlotId = null;
+  }
+  renderSlotSelect();
+}
+
+function renderSlotSelect(){
+  var slotSel = $('f-slot');
+  slotSel.innerHTML = '';
+  var dateObj = selectedDateId ? findDateObj(selectedDateId) : null;
+  if (!dateObj){
+    var ph = document.createElement('option');
+    ph.value = ''; ph.textContent = '請先選擇日期';
+    slotSel.appendChild(ph);
+    slotSel.disabled = true;
+    selectedSlotId = null;
+    renderNamesPreview();
+    return;
+  }
+  slotSel.disabled = submitting;
+  var ph2 = document.createElement('option');
+  ph2.value = ''; ph2.textContent = '請選擇時段';
+  slotSel.appendChild(ph2);
+  dateObj.slots.forEach(function(slot){
+    var full = slot.remaining <= 0;
+    var opt = document.createElement('option');
+    opt.value = slot.id;
+    opt.textContent = fmtRange(slot) + (full ? '（已額滿）' : '（剩 ' + slot.remaining + ' 位）');
+    opt.disabled = full;
+    slotSel.appendChild(opt);
+  });
+  if (selectedSlotId && findSlotObj(dateObj, selectedSlotId)){
+    slotSel.value = selectedSlotId;
+  } else {
+    slotSel.value = '';
+    selectedSlotId = null;
+  }
+  renderNamesPreview();
+}
+
+function renderNamesPreview(){
+  var el = $('slot-names-preview');
+  el.textContent = '';
+  var dateObj = selectedDateId ? findDateObj(selectedDateId) : null;
+  var slot = dateObj && selectedSlotId ? findSlotObj(dateObj, selectedSlotId) : null;
+  if (!slot || !slot.names || !slot.names.length) return;
+  var shown = slot.names.slice(0, 4).join('、');
+  el.textContent = slot.names.length > 4
+    ? (shown + ' 等共 ' + slot.names.length + ' 人已報名這個時段')
+    : (shown + ' 已報名這個時段');
+}
+
+function renderSubmitButton(){
+  var btn = $('submit-btn');
+  btn.disabled = submitting;
+  btn.textContent = submitting ? '送出中…' : '確認預約這個時段';
+}
+
+function renderMyStatus(){
+  var box = $('my-status');
+  var sid = '';
+  try {
+    var raw = localStorage.getItem('gpb_last_identity');
+    if (raw) sid = JSON.parse(raw).sid || '';
+  } catch (e) {}
+  if (!sid){ box.classList.remove('is-visible'); return; }
+  // The public state payload doesn't include student IDs (privacy), so this
+  // banner is best-effort based on this browser's own last successful submission.
+  try {
+    var lastSuccess = localStorage.getItem('gpb_last_success');
+    if (lastSuccess) {
+      box.classList.add('is-visible');
+      box.textContent = lastSuccess;
+      return;
+    }
+  } catch (e) {}
+  box.classList.remove('is-visible');
+}
+
+async function handleSubmitClick(){
+  if (submitting) return;
+  clearMessage();
+  var className = $('f-class').value.trim();
+  var sid = $('f-id').value.trim();
+  var name = $('f-name').value.trim();
+  var phone = $('f-phone').value.trim();
+  if (!className){ showMessage('error', '請輸入班級'); return; }
+  if (!sid){ showMessage('error', '請輸入學號'); return; }
+  if (!name){ showMessage('error', '請輸入姓名'); return; }
+  if (!phone){ showMessage('error', '請輸入聯絡電話'); return; }
+  if (!selectedDateId || !selectedSlotId){ showMessage('error', '請先選擇一個時段'); return; }
+
+  submitting = true;
+  renderSubmitButton();
+  try {
+    var res = await apiPost({
+      action: 'book', dateId: selectedDateId, slotId: selectedSlotId,
+      studentId: sid, name: name, className: className, phone: phone
+    });
+    submitting = false;
+    if (res && res.ok){
+      try {
+        localStorage.setItem('gpb_last_identity', JSON.stringify({ name: name, sid: sid, className: className, phone: phone }));
+        var dateObj = findDateObj(selectedDateId);
+        var slot = dateObj ? findSlotObj(dateObj, selectedSlotId) : null;
+        var loc = dateObj && slot ? (dateObj.label + '　' + fmtRange(slot)) : '';
+        localStorage.setItem('gpb_last_success', '你已預約時段：' + loc + '（每人限選一次，如需更改請聯絡負責同學）');
+      } catch (e) {}
+      showMessage('success', res.message || '預約成功！');
+      appState = res;
+      selectedDateId = null;
+      selectedSlotId = null;
+      renderPicker();
+      renderMyStatus();
+    } else {
+      showMessage('error', (res && res.message) || '送出失敗，請稍後再試一次。');
+      if (res && (res.dates)) { appState = res; renderPicker(); }
+    }
+  } catch (e){
+    submitting = false;
+    renderSubmitButton();
+    showMessage('error', '網路連線有問題，請稍後再試一次。');
+  }
+}
+
+// ---------- Admin ----------
+
+function showAdminError(text){
+  var el = $('admin-key-error');
+  if (el) el.remove();
+  var p = document.createElement('p');
+  p.id = 'admin-key-error';
+  p.style.color = '#F4C9BE';
+  p.style.fontSize = '0.86rem';
+  p.style.marginTop = '8px';
+  p.textContent = text;
+  $('admin-login').appendChild(p);
+}
+
+async function attemptAdminLogin(key){
+  var res = await apiPost({ action: 'admin_list', adminKey: key });
+  if (res && res.ok){
+    adminKey = key;
+    adminData = res;
+    try { localStorage.setItem('gpb_admin_key', key); } catch (e) {}
+    $('admin-login').style.display = 'none';
+    $('admin-toggle-link').style.display = 'none';
+    renderAdminPanel();
+    return true;
+  }
+  return false;
+}
+
+function renderAdminPanel(){
+  var panel = $('admin-panel');
+  if (!adminKey || !adminData){ panel.classList.remove('is-visible'); panel.innerHTML = ''; return; }
+  panel.classList.add('is-visible');
+  panel.innerHTML = '';
+
+  var section = document.createElement('section');
+  section.className = 'card';
+
+  var h2 = document.createElement('h2');
+  h2.textContent = '管理面板';
+  section.appendChild(h2);
+
+  var addLabel = document.createElement('label');
+  addLabel.textContent = '新增拍照日期（自動產生完整時段表）';
+  addLabel.style.display = 'block';
+  addLabel.style.fontSize = '0.84rem';
+  addLabel.style.color = 'var(--ink-muted)';
+  addLabel.style.marginBottom = '8px';
+  section.appendChild(addLabel);
+
+  var addRow = document.createElement('div');
+  addRow.style.display = 'flex';
+  addRow.style.gap = '8px';
+  addRow.style.marginBottom = '20px';
+  var addInput = document.createElement('input');
+  addInput.type = 'text';
+  addInput.placeholder = '例：6月15日（一）';
+  addInput.style.flex = '1';
+  addInput.style.padding = '11px 13px';
+  addInput.style.borderRadius = '9px';
+  addInput.style.border = '1px solid var(--divider)';
+  addInput.style.background = 'rgba(255,255,255,0.04)';
+  addInput.style.color = 'var(--ink-on-navy)';
+  var addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn btn-primary';
+  addBtn.textContent = '新增';
+  addBtn.addEventListener('click', async function(){
+    var label = addInput.value.trim();
+    if (!label) return;
+    var res = await apiPost({ action: 'admin_add_date', adminKey: adminKey, label: label });
+    if (res && res.ok){ addInput.value = ''; await refreshAdmin(res.message); }
+    else showMessage('error', (res && res.message) || '新增失敗');
+  });
+  addRow.appendChild(addInput);
+  addRow.appendChild(addBtn);
+  section.appendChild(addRow);
+
+  if (adminData.dates && adminData.dates.length){
+    var listTitle = document.createElement('p');
+    listTitle.className = 'admin-stats';
+    listTitle.textContent = '目前開放的日期';
+    section.appendChild(listTitle);
+    var list = document.createElement('ul');
+    list.className = 'admin-date-list';
+    adminData.dates.forEach(function(d){
+      var count = adminData.bookings.filter(function(b){ return b.dateId === d.id; }).length;
+      var row = document.createElement('li');
+      row.className = 'admin-date-row';
+      var left = document.createElement('div');
+      var lbl = document.createElement('div'); lbl.className = 'admin-date-row-label'; lbl.textContent = d.label;
+      var meta = document.createElement('div'); meta.className = 'admin-date-row-meta'; meta.textContent = count + ' 筆預約';
+      left.appendChild(lbl); left.appendChild(meta);
+      var removeBtn = document.createElement('button');
+      removeBtn.type = 'button'; removeBtn.className = 'btn-link-danger'; removeBtn.textContent = '移除';
+      removeBtn.addEventListener('click', async function(){
+        var res = await apiPost({ action: 'admin_remove_date', adminKey: adminKey, dateId: d.id });
+        if (res && res.ok) await refreshAdmin(res.message);
+        else window.alert((res && res.message) || '移除失敗');
+      });
+      row.appendChild(left);
+      row.appendChild(removeBtn);
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+  }
+
+  var stats = document.createElement('p');
+  stats.className = 'admin-stats';
+  stats.textContent = '共 ' + adminData.bookings.length + ' 筆預約';
+  section.appendChild(stats);
+
+  var resetBtn = document.createElement('button');
+  resetBtn.type = 'button'; resetBtn.className = 'btn btn-danger'; resetBtn.textContent = '清空所有預約名單';
+  resetBtn.addEventListener('click', async function(){
+    if (!window.confirm('確定要清空所有人的預約名單嗎？此動作無法復原。')) return;
+    var res = await apiPost({ action: 'admin_reset', adminKey: adminKey });
+    if (res && res.ok) await refreshAdmin(res.message);
+  });
+  section.appendChild(resetBtn);
+
+  var tableWrap = document.createElement('div');
+  tableWrap.className = 'admin-table-wrap';
+  var table = document.createElement('table');
+  table.className = 'admin-table';
+  var thead = document.createElement('thead');
+  thead.innerHTML = '<tr><th>日期</th><th>時段</th><th>班級</th><th>姓名</th><th>學號</th><th>聯絡電話</th><th></th></tr>';
+  table.appendChild(thead);
+  var tbody = document.createElement('tbody');
+  var sorted = adminData.bookings.slice().sort(function(a, b){
+    return a.dateId.localeCompare(b.dateId) || a.slotId.localeCompare(b.slotId);
+  });
+  sorted.forEach(function(b){
+    var dateObj = adminData.dates.find(function(d){ return d.id === b.dateId; });
+    var slotT = [{ id: 's1', start: '09:00', end: '10:00' }, { id: 's2', start: '10:00', end: '11:00' },
+      { id: 's3', start: '11:00', end: '12:00' }, { id: 's4', start: '13:00', end: '14:00' },
+      { id: 's5', start: '14:00', end: '15:00' }, { id: 's6', start: '15:00', end: '16:00' },
+      { id: 's7', start: '16:00', end: '17:00' }, { id: 's8', start: '17:00', end: '18:00' }
+    ].find(function(s){ return s.id === b.slotId; });
+    var tr = document.createElement('tr');
+    var tdDate = document.createElement('td'); tdDate.textContent = dateObj ? dateObj.label : b.dateId;
+    var tdSlot = document.createElement('td'); tdSlot.textContent = slotT ? (slotT.start + ' - ' + slotT.end) : b.slotId;
+    var tdClass = document.createElement('td'); tdClass.textContent = b.className;
+    var tdName = document.createElement('td'); tdName.textContent = b.name;
+    var tdId = document.createElement('td'); tdId.textContent = b.studentId;
+    var tdPhone = document.createElement('td'); tdPhone.textContent = b.phone;
+    var tdAction = document.createElement('td');
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button'; cancelBtn.className = 'btn-link-danger'; cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', async function(){
+      if (!window.confirm('確定要取消 學號 ' + b.studentId + ' 的這筆預約嗎？')) return;
+      var res = await apiPost({ action: 'admin_cancel', adminKey: adminKey, dateId: b.dateId, slotId: b.slotId, studentId: b.studentId });
+      if (res && res.ok) await refreshAdmin(res.message);
+    });
+    tdAction.appendChild(cancelBtn);
+    tr.appendChild(tdDate); tr.appendChild(tdSlot); tr.appendChild(tdClass); tr.appendChild(tdName); tr.appendChild(tdId); tr.appendChild(tdPhone); tr.appendChild(tdAction);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  tableWrap.appendChild(table);
+  section.appendChild(tableWrap);
+
+  panel.appendChild(section);
+}
+
+async function refreshAdmin(message){
+  var res = await apiPost({ action: 'admin_list', adminKey: adminKey });
+  if (res && res.ok){
+    adminData = res;
+    renderAdminPanel();
+  }
+  await loadState();
+  if (message) showMessage('info', message);
+}
+
+function init(){
+  $('submit-btn').addEventListener('click', handleSubmitClick);
+  $('f-date').addEventListener('change', function(){
+    selectedDateId = $('f-date').value || null;
+    selectedSlotId = null;
+    renderSlotSelect();
+  });
+  $('f-slot').addEventListener('change', function(){
+    selectedSlotId = $('f-slot').value || null;
+    renderNamesPreview();
+  });
+
+  try {
+    var raw = localStorage.getItem('gpb_last_identity');
+    if (raw){
+      var data = JSON.parse(raw);
+      if (data.className) $('f-class').value = data.className;
+      if (data.sid) $('f-id').value = data.sid;
+      if (data.name) $('f-name').value = data.name;
+      if (data.phone) $('f-phone').value = data.phone;
+    }
+  } catch (e) {}
+
+  $('admin-toggle-link').addEventListener('click', function(){
+    $('admin-login').style.display = $('admin-login').style.display === 'none' ? 'block' : 'none';
+  });
+  $('admin-login-btn').addEventListener('click', async function(){
+    var key = $('admin-key-input').value;
+    var ok = await attemptAdminLogin(key);
+    if (!ok) showAdminError('管理密碼錯誤，請再試一次。');
+  });
+
+  if (API_URL === 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'){
+    showMessage('error', '尚未設定 API_URL：請部署 Apps Script 後，把網頁應用程式網址填進 index.html 最上面的 API_URL。');
+  }
+
+  loadState();
+
+  try {
+    var savedKey = localStorage.getItem('gpb_admin_key');
+    if (savedKey) attemptAdminLogin(savedKey);
+  } catch (e) {}
+}
+
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
