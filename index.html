@@ -127,6 +127,10 @@
       <label for="f-phone">聯絡電話</label>
       <input type="tel" id="f-phone" placeholder="例：0912345678" autocomplete="tel">
     </div>
+    <div class="field">
+      <label for="f-email">電子郵箱</label>
+      <input type="email" id="f-email" placeholder="例：個人郵箱（請勿使用學校信箱）" autocomplete="email">
+    </div>
   </section>
 
   <h2 class="section-title">選擇時段</h2>
@@ -164,6 +168,7 @@
 
 // ⚠️ 部署 Apps Script 後，把下面換成你自己的「網頁應用程式」網址（結尾是 /exec）
 var API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+var BLOCKED_EMAIL_DOMAIN = '@gm.cyut.edu.tw';
 
 var appState = { dates: [] };
 var selectedDateId = null;
@@ -337,10 +342,16 @@ async function handleSubmitClick(){
   var sid = $('f-id').value.trim();
   var name = $('f-name').value.trim();
   var phone = $('f-phone').value.trim();
+  var email = $('f-email').value.trim();
   if (!className){ showMessage('error', '請輸入班級'); return; }
   if (!sid){ showMessage('error', '請輸入學號'); return; }
   if (!name){ showMessage('error', '請輸入姓名'); return; }
   if (!phone){ showMessage('error', '請輸入聯絡電話'); return; }
+  if (!email){ showMessage('error', '請輸入電子郵箱'); return; }
+  if (email.toLowerCase().indexOf(BLOCKED_EMAIL_DOMAIN) !== -1){
+    showMessage('error', '請填寫個人信箱，不能使用學校信箱（' + BLOCKED_EMAIL_DOMAIN + '）報名。');
+    return;
+  }
   if (!selectedDateId || !selectedSlotId){ showMessage('error', '請先選擇一個時段'); return; }
 
   submitting = true;
@@ -348,12 +359,12 @@ async function handleSubmitClick(){
   try {
     var res = await apiPost({
       action: 'book', dateId: selectedDateId, slotId: selectedSlotId,
-      studentId: sid, name: name, className: className, phone: phone
+      studentId: sid, name: name, className: className, phone: phone, email: email
     });
     submitting = false;
     if (res && res.ok){
       try {
-        localStorage.setItem('gpb_last_identity', JSON.stringify({ name: name, sid: sid, className: className, phone: phone }));
+        localStorage.setItem('gpb_last_identity', JSON.stringify({ name: name, sid: sid, className: className, phone: phone, email: email }));
         var dateObj = findDateObj(selectedDateId);
         var slot = dateObj ? findSlotObj(dateObj, selectedSlotId) : null;
         var loc = dateObj && slot ? (dateObj.label + '　' + fmtRange(slot)) : '';
@@ -378,6 +389,38 @@ async function handleSubmitClick(){
 
 // ---------- Admin ----------
 
+var STANDARD_SLOTS = [
+  { id: 's1', start: '09:00', end: '10:00' },
+  { id: 's2', start: '10:00', end: '11:00' },
+  { id: 's3', start: '11:00', end: '12:00' },
+  { id: 's4', start: '13:00', end: '14:00' },
+  { id: 's5', start: '14:00', end: '15:00' },
+  { id: 's6', start: '15:00', end: '16:00' },
+  { id: 's7', start: '16:00', end: '17:00' },
+  { id: 's8', start: '17:00', end: '18:00' }
+];
+function slotRangeById(slotId){
+  var s = STANDARD_SLOTS.find(function(x){ return x.id === slotId; });
+  return s ? (s.start + ' - ' + s.end) : slotId;
+}
+
+// Central place for every admin write: always shows either a success refresh
+// or a visible error, so a failure never just looks like "nothing happened".
+async function adminAction(payload){
+  try {
+    var res = await apiPost(payload);
+    if (res && res.ok){
+      await refreshAdmin(res.message);
+      return true;
+    }
+    showMessage('error', (res && res.message) || '操作失敗，請稍後再試一次。');
+    return false;
+  } catch (e){
+    showMessage('error', '網路連線有問題，操作沒有送出，請確認網路狀況後再試一次。');
+    return false;
+  }
+}
+
 function showAdminError(text){
   var el = $('admin-key-error');
   if (el) el.remove();
@@ -391,17 +434,21 @@ function showAdminError(text){
 }
 
 async function attemptAdminLogin(key){
-  var res = await apiPost({ action: 'admin_list', adminKey: key });
-  if (res && res.ok){
-    adminKey = key;
-    adminData = res;
-    try { localStorage.setItem('gpb_admin_key', key); } catch (e) {}
-    $('admin-login').style.display = 'none';
-    $('admin-toggle-link').style.display = 'none';
-    renderAdminPanel();
-    return true;
+  try {
+    var res = await apiPost({ action: 'admin_list', adminKey: key });
+    if (res && res.ok){
+      adminKey = key;
+      adminData = res;
+      try { localStorage.setItem('gpb_admin_key', key); } catch (e) {}
+      $('admin-login').style.display = 'none';
+      $('admin-toggle-link').style.display = 'none';
+      renderAdminPanel();
+      return 'ok';
+    }
+    return 'unauthorized';
+  } catch (e){
+    return 'network_error';
   }
-  return false;
 }
 
 function renderAdminPanel(){
@@ -445,9 +492,8 @@ function renderAdminPanel(){
   addBtn.addEventListener('click', async function(){
     var label = addInput.value.trim();
     if (!label) return;
-    var res = await apiPost({ action: 'admin_add_date', adminKey: adminKey, label: label });
-    if (res && res.ok){ addInput.value = ''; await refreshAdmin(res.message); }
-    else showMessage('error', (res && res.message) || '新增失敗');
+    var ok = await adminAction({ action: 'admin_add_date', adminKey: adminKey, label: label });
+    if (ok) addInput.value = '';
   });
   addRow.appendChild(addInput);
   addRow.appendChild(addBtn);
@@ -470,10 +516,8 @@ function renderAdminPanel(){
       left.appendChild(lbl); left.appendChild(meta);
       var removeBtn = document.createElement('button');
       removeBtn.type = 'button'; removeBtn.className = 'btn-link-danger'; removeBtn.textContent = '移除';
-      removeBtn.addEventListener('click', async function(){
-        var res = await apiPost({ action: 'admin_remove_date', adminKey: adminKey, dateId: d.id });
-        if (res && res.ok) await refreshAdmin(res.message);
-        else window.alert((res && res.message) || '移除失敗');
+      removeBtn.addEventListener('click', function(){
+        adminAction({ action: 'admin_remove_date', adminKey: adminKey, dateId: d.id });
       });
       row.appendChild(left);
       row.appendChild(removeBtn);
@@ -489,53 +533,85 @@ function renderAdminPanel(){
 
   var resetBtn = document.createElement('button');
   resetBtn.type = 'button'; resetBtn.className = 'btn btn-danger'; resetBtn.textContent = '清空所有預約名單';
-  resetBtn.addEventListener('click', async function(){
+  resetBtn.addEventListener('click', function(){
     if (!window.confirm('確定要清空所有人的預約名單嗎？此動作無法復原。')) return;
-    var res = await apiPost({ action: 'admin_reset', adminKey: adminKey });
-    if (res && res.ok) await refreshAdmin(res.message);
+    adminAction({ action: 'admin_reset', adminKey: adminKey });
   });
   section.appendChild(resetBtn);
 
-  var tableWrap = document.createElement('div');
-  tableWrap.className = 'admin-table-wrap';
-  var table = document.createElement('table');
-  table.className = 'admin-table';
-  var thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>日期</th><th>時段</th><th>班級</th><th>姓名</th><th>學號</th><th>聯絡電話</th><th></th></tr>';
-  table.appendChild(thead);
-  var tbody = document.createElement('tbody');
-  var sorted = adminData.bookings.slice().sort(function(a, b){
-    return a.dateId.localeCompare(b.dateId) || a.slotId.localeCompare(b.slotId);
-  });
-  sorted.forEach(function(b){
-    var dateObj = adminData.dates.find(function(d){ return d.id === b.dateId; });
-    var slotT = [{ id: 's1', start: '09:00', end: '10:00' }, { id: 's2', start: '10:00', end: '11:00' },
-      { id: 's3', start: '11:00', end: '12:00' }, { id: 's4', start: '13:00', end: '14:00' },
-      { id: 's5', start: '14:00', end: '15:00' }, { id: 's6', start: '15:00', end: '16:00' },
-      { id: 's7', start: '16:00', end: '17:00' }, { id: 's8', start: '17:00', end: '18:00' }
-    ].find(function(s){ return s.id === b.slotId; });
-    var tr = document.createElement('tr');
-    var tdDate = document.createElement('td'); tdDate.textContent = dateObj ? dateObj.label : b.dateId;
-    var tdSlot = document.createElement('td'); tdSlot.textContent = slotT ? (slotT.start + ' - ' + slotT.end) : b.slotId;
-    var tdClass = document.createElement('td'); tdClass.textContent = b.className;
-    var tdName = document.createElement('td'); tdName.textContent = b.name;
-    var tdId = document.createElement('td'); tdId.textContent = b.studentId;
-    var tdPhone = document.createElement('td'); tdPhone.textContent = b.phone;
-    var tdAction = document.createElement('td');
-    var cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button'; cancelBtn.className = 'btn-link-danger'; cancelBtn.textContent = '取消';
-    cancelBtn.addEventListener('click', async function(){
-      if (!window.confirm('確定要取消 學號 ' + b.studentId + ' 的這筆預約嗎？')) return;
-      var res = await apiPost({ action: 'admin_cancel', adminKey: adminKey, dateId: b.dateId, slotId: b.slotId, studentId: b.studentId });
-      if (res && res.ok) await refreshAdmin(res.message);
+  if (!adminData.bookings.length){
+    var noneMsg = document.createElement('p');
+    noneMsg.className = 'admin-stats';
+    noneMsg.textContent = '目前還沒有人報名。';
+    section.appendChild(noneMsg);
+  } else {
+    var pickLabel = document.createElement('label');
+    pickLabel.textContent = '選擇要管理的預約';
+    pickLabel.style.display = 'block';
+    pickLabel.style.fontSize = '0.84rem';
+    pickLabel.style.color = 'var(--ink-muted)';
+    pickLabel.style.marginBottom = '8px';
+    section.appendChild(pickLabel);
+
+    var bookingSelect = document.createElement('select');
+    bookingSelect.style.width = '100%';
+    bookingSelect.style.padding = '11px 13px';
+    bookingSelect.style.borderRadius = '9px';
+    bookingSelect.style.border = '1px solid var(--divider)';
+    bookingSelect.style.background = 'rgba(255,255,255,0.04)';
+    bookingSelect.style.color = 'var(--ink-on-navy)';
+    bookingSelect.style.marginBottom = '12px';
+    bookingSelect.style.fontFamily = 'inherit';
+    bookingSelect.style.fontSize = '0.94rem';
+
+    var sortedBookings = adminData.bookings.slice().sort(function(a, b){
+      return a.dateId.localeCompare(b.dateId) || a.slotId.localeCompare(b.slotId);
     });
-    tdAction.appendChild(cancelBtn);
-    tr.appendChild(tdDate); tr.appendChild(tdSlot); tr.appendChild(tdClass); tr.appendChild(tdName); tr.appendChild(tdId); tr.appendChild(tdPhone); tr.appendChild(tdAction);
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-  tableWrap.appendChild(table);
-  section.appendChild(tableWrap);
+    sortedBookings.forEach(function(b, idx){
+      var dateObj = adminData.dates.find(function(d){ return d.id === b.dateId; });
+      var opt = document.createElement('option');
+      opt.value = String(idx);
+      opt.textContent = (dateObj ? dateObj.label : b.dateId) + '　' + slotRangeById(b.slotId) + '　' + b.name + '（' + b.studentId + '）';
+      bookingSelect.appendChild(opt);
+    });
+    section.appendChild(bookingSelect);
+
+    var detailBox = document.createElement('div');
+    detailBox.style.fontSize = '0.86rem';
+    detailBox.style.color = 'var(--ink-muted)';
+    detailBox.style.marginBottom = '14px';
+    detailBox.style.lineHeight = '1.7';
+    section.appendChild(detailBox);
+
+    function renderBookingDetail(){
+      var b = sortedBookings[Number(bookingSelect.value)];
+      detailBox.innerHTML = '';
+      if (!b) return;
+      [
+        '班級：' + b.className,
+        '聯絡電話：' + b.phone,
+        '電子郵箱：' + (b.email || '（未填寫）')
+      ].forEach(function(t){
+        var p = document.createElement('div');
+        p.textContent = t;
+        detailBox.appendChild(p);
+      });
+    }
+    bookingSelect.addEventListener('change', renderBookingDetail);
+    renderBookingDetail();
+
+    var deleteBookingBtn = document.createElement('button');
+    deleteBookingBtn.type = 'button';
+    deleteBookingBtn.className = 'btn btn-danger';
+    deleteBookingBtn.textContent = '刪除這筆預約';
+    deleteBookingBtn.addEventListener('click', function(){
+      var b = sortedBookings[Number(bookingSelect.value)];
+      if (!b) return;
+      if (!window.confirm('確定要刪除「' + b.name + '」（學號 ' + b.studentId + '）的這筆預約嗎？')) return;
+      adminAction({ action: 'admin_cancel', adminKey: adminKey, dateId: b.dateId, slotId: b.slotId, studentId: b.studentId });
+    });
+    section.appendChild(deleteBookingBtn);
+  }
 
   panel.appendChild(section);
 }
@@ -570,6 +646,7 @@ function init(){
       if (data.sid) $('f-id').value = data.sid;
       if (data.name) $('f-name').value = data.name;
       if (data.phone) $('f-phone').value = data.phone;
+      if (data.email) $('f-email').value = data.email;
     }
   } catch (e) {}
 
@@ -578,8 +655,9 @@ function init(){
   });
   $('admin-login-btn').addEventListener('click', async function(){
     var key = $('admin-key-input').value;
-    var ok = await attemptAdminLogin(key);
-    if (!ok) showAdminError('管理密碼錯誤，請再試一次。');
+    var result = await attemptAdminLogin(key);
+    if (result === 'unauthorized') showAdminError('管理密碼錯誤，請再試一次。');
+    else if (result === 'network_error') showAdminError('無法連線到系統，請確認網路連線後再試一次。');
   });
 
   if (API_URL === 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'){
