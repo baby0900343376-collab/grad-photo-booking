@@ -231,8 +231,7 @@ function findSlotObj(dateObj, slotId){
 function fmtRange(slot){ return slot.start + ' - ' + slot.end; }
 
 async function apiGet(){
-  var res = await fetch(API_URL, { method: 'GET' });
-  return res.json();
+  return apiPost({ action: 'get_state' });
 }
 async function apiPost(payload){
   var res = await fetch(API_URL, {
