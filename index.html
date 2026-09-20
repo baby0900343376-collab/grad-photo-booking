@@ -37,10 +37,10 @@
 
   #status-message{
     position:fixed; top:calc(20px + env(safe-area-inset-top,0px)); left:50%;
-    transform:translateX(-50%) translateY(-16px); width:min(420px, calc(100% - 32px));
+    transform:translateX(-50%) translateY(-8px); width:min(420px, calc(100% - 32px));
     display:flex; align-items:flex-start; gap:10px; margin:0; padding:14px 16px; border-radius:12px;
     font-size:0.92rem; box-shadow:0 14px 34px rgba(43,38,34,0.22); z-index:1000;
-    opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease;
+    opacity:0; pointer-events:none; transition:opacity .12s ease, transform .12s ease;
   }
   #status-message.is-visible{opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto;}
   #status-message .toast-text{flex:1; line-height:1.5;}
@@ -197,6 +197,10 @@
 // ⚠️ 部署 Apps Script 後，把下面換成你自己的「網頁應用程式」網址（結尾是 /exec）
 var API_URL = 'https://script.google.com/macros/s/AKfycbxvOUs_Eqw6fmdzNnBYfnyM64sATfOHFwJPcdy9LVaq_Tn7QxLVr7eXThIXQZwiOUrSFQ/exec';
 var BLOCKED_EMAIL_DOMAIN = '@gm.cyut.edu.tw';
+// Must match SLOT_CAPACITY in apps-script-code.gs. Only used to compute the
+// picker's remaining-seats display locally after an admin action, so we don't
+// need a second round-trip to the backend just to re-fetch the same number.
+var DEFAULT_SLOT_CAPACITY_FALLBACK = 25;
 
 var appState = { dates: [] };
 var selectedDateId = null;
@@ -424,10 +428,15 @@ function slotRangeById(slotId){
 // Central place for every admin write: always shows either a success refresh
 // or a visible error, so a failure never just looks like "nothing happened".
 async function adminAction(payload){
+  showMessage('info', '處理中…');
   try {
     var res = await apiPost(payload);
     if (res && res.ok){
-      await refreshAdmin(res.message);
+      adminData = res;
+      renderAdminPanel();
+      appState = buildAppStateFromAdminData(res);
+      renderPicker();
+      if (res.message) showMessage('info', res.message);
       return true;
     }
     showMessage('error', (res && res.message) || '操作失敗，請稍後再試一次。');
@@ -647,14 +656,19 @@ function renderAdminPanel(){
   panel.appendChild(section);
 }
 
-async function refreshAdmin(message){
-  var res = await apiPost({ action: 'admin_list', adminKey: adminKey });
-  if (res && res.ok){
-    adminData = res;
-    renderAdminPanel();
-  }
-  await loadState();
-  if (message) showMessage('info', message);
+function buildAppStateFromAdminData(data){
+  var dates = data.dates.map(function(d){
+    var slots = STANDARD_SLOTS.map(function(t){
+      var inSlot = data.bookings.filter(function(b){ return b.dateId === d.id && b.slotId === t.id; });
+      return {
+        id: t.id, start: t.start, end: t.end, capacity: DEFAULT_SLOT_CAPACITY_FALLBACK,
+        remaining: Math.max(0, DEFAULT_SLOT_CAPACITY_FALLBACK - inSlot.length),
+        names: inSlot.map(function(b){ return b.name; })
+      };
+    });
+    return { id: d.id, label: d.label, slots: slots };
+  });
+  return { ok: true, dates: dates };
 }
 
 function init(){
@@ -679,9 +693,11 @@ function init(){
   });
   $('admin-login-btn').addEventListener('click', async function(){
     var key = $('admin-key-input').value;
+    showMessage('info', '登入中…');
     var result = await attemptAdminLogin(key);
-    if (result === 'unauthorized') showAdminError('管理密碼錯誤，請再試一次。');
-    else if (result === 'network_error') showAdminError('無法連線到系統，請確認網路連線後再試一次。');
+    if (result === 'ok'){ clearMessage(); }
+    else if (result === 'unauthorized'){ clearMessage(); showAdminError('管理密碼錯誤，請再試一次。'); }
+    else if (result === 'network_error'){ clearMessage(); showAdminError('無法連線到系統，請確認網路連線後再試一次。'); }
   });
 
   if (API_URL === 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'){
