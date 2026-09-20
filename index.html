@@ -91,6 +91,12 @@
   .btn-link-danger{background:none; color:var(--error); border:none; padding:4px 8px; font-size:0.84rem; text-decoration:underline; cursor:pointer;}
 
   .admin-toggle-link{font-size:0.8rem; color:var(--ink-muted); text-decoration:underline; cursor:pointer; background:none; border:none; padding:0;}
+  .admin-panel-header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;}
+  .admin-close-btn{
+    font-size:0.8rem; color:var(--ink-muted); background:none; border:1px solid var(--divider);
+    border-radius:8px; padding:6px 12px; cursor:pointer; white-space:nowrap;
+  }
+  .admin-close-btn:hover{color:var(--ink-on-navy); border-color:var(--ink-muted);}
   #admin-login{margin-top:40px;}
   #admin-panel{display:none; margin-top:20px;}
   #admin-panel.is-visible{display:block;}
@@ -456,6 +462,15 @@ async function attemptAdminLogin(key){
   }
 }
 
+function closeAdminPanel(){
+  var panel = $('admin-panel');
+  panel.classList.remove('is-visible');
+  panel.innerHTML = '';
+  var link = $('admin-toggle-link');
+  link.style.display = 'inline-block';
+  link.textContent = (adminKey && adminData) ? '管理面板' : '管理者登入';
+}
+
 function renderAdminPanel(){
   var panel = $('admin-panel');
   if (!adminKey || !adminData){ panel.classList.remove('is-visible'); panel.innerHTML = ''; return; }
@@ -465,9 +480,22 @@ function renderAdminPanel(){
   var section = document.createElement('section');
   section.className = 'card';
 
+  var headerRow = document.createElement('div');
+  headerRow.className = 'admin-panel-header';
+
   var h2 = document.createElement('h2');
   h2.textContent = '管理面板';
-  section.appendChild(h2);
+  h2.style.margin = '0';
+  headerRow.appendChild(h2);
+
+  var closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'admin-close-btn';
+  closeBtn.textContent = '關閉管理面板';
+  closeBtn.addEventListener('click', closeAdminPanel);
+  headerRow.appendChild(closeBtn);
+
+  section.appendChild(headerRow);
 
   var addLabel = document.createElement('label');
   addLabel.textContent = '新增拍照日期（自動產生完整時段表）';
@@ -636,7 +664,12 @@ function init(){
   });
 
   $('admin-toggle-link').addEventListener('click', function(){
-    $('admin-login').style.display = $('admin-login').style.display === 'none' ? 'block' : 'none';
+    if (adminKey && adminData){
+      $('admin-toggle-link').style.display = 'none';
+      renderAdminPanel();
+    } else {
+      $('admin-login').style.display = $('admin-login').style.display === 'none' ? 'block' : 'none';
+    }
   });
   $('admin-login-btn').addEventListener('click', async function(){
     var key = $('admin-key-input').value;
