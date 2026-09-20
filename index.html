@@ -52,9 +52,6 @@
   #status-message.type-success{background:#122A1E; color:#CFE9D9; border:1px solid rgba(76,135,103,0.5);}
   #status-message.type-info{background:#241C0E; color:#F1DCA6; border:1px solid rgba(199,154,62,0.5);}
 
-  #my-status{display:none; margin:0 0 20px; padding:10px 14px; background:rgba(199,154,62,0.12); border:1px dashed var(--gold); border-radius:10px; font-size:0.88rem; color:#F1DCA6;}
-  #my-status.is-visible{display:block;}
-
   section.card{background:var(--bg-panel); border:1px solid var(--divider); border-radius:14px; padding:20px; margin-bottom:28px;}
   section.card h2{font-family:'Noto Serif TC', serif; font-size:1.15rem; margin:0 0 14px; font-weight:600;}
   .field{margin-bottom:14px;}
@@ -119,7 +116,6 @@
   </header>
 
   <div id="status-message"></div>
-  <div id="my-status"></div>
 
   <section class="card">
     <h2>你的報名資料</h2>
@@ -251,7 +247,6 @@ async function loadState(){
     }
     appState = data;
     renderPicker();
-    renderMyStatus();
   } catch (e){
     showMessage('error', '無法連線到報名系統，請確認網路連線，或稍後再試一次。');
   }
@@ -344,27 +339,6 @@ function renderSubmitButton(){
   btn.textContent = submitting ? '送出中…' : '確認預約這個時段';
 }
 
-function renderMyStatus(){
-  var box = $('my-status');
-  var sid = '';
-  try {
-    var raw = localStorage.getItem('gpb_last_identity');
-    if (raw) sid = JSON.parse(raw).sid || '';
-  } catch (e) {}
-  if (!sid){ box.classList.remove('is-visible'); return; }
-  // The public state payload doesn't include student IDs (privacy), so this
-  // banner is best-effort based on this browser's own last successful submission.
-  try {
-    var lastSuccess = localStorage.getItem('gpb_last_success');
-    if (lastSuccess) {
-      box.classList.add('is-visible');
-      box.textContent = lastSuccess;
-      return;
-    }
-  } catch (e) {}
-  box.classList.remove('is-visible');
-}
-
 async function handleSubmitClick(){
   if (submitting) return;
   clearMessage();
@@ -394,19 +368,11 @@ async function handleSubmitClick(){
     submitting = false;
     renderSubmitButton();
     if (res && res.ok){
-      try {
-        localStorage.setItem('gpb_last_identity', JSON.stringify({ name: name, sid: sid, className: className, phone: phone, email: email }));
-        var dateObj = findDateObj(selectedDateId);
-        var slot = dateObj ? findSlotObj(dateObj, selectedSlotId) : null;
-        var loc = dateObj && slot ? (dateObj.label + '　' + fmtRange(slot)) : '';
-        localStorage.setItem('gpb_last_success', '你已預約時段：' + loc + '（每人限選一次，如需更改請聯絡負責同學）');
-      } catch (e) {}
       showMessage('success', res.message || '預約成功！');
       appState = res;
       selectedDateId = null;
       selectedSlotId = null;
       renderPicker();
-      renderMyStatus();
     } else {
       showMessage('error', (res && res.message) || '送出失敗，請稍後再試一次。');
       if (res && (res.dates)) { appState = res; renderPicker(); }
@@ -668,18 +634,6 @@ function init(){
     selectedSlotId = $('f-slot').value || null;
     renderNamesPreview();
   });
-
-  try {
-    var raw = localStorage.getItem('gpb_last_identity');
-    if (raw){
-      var data = JSON.parse(raw);
-      if (data.className) $('f-class').value = data.className;
-      if (data.sid) $('f-id').value = data.sid;
-      if (data.name) $('f-name').value = data.name;
-      if (data.phone) $('f-phone').value = data.phone;
-      if (data.email) $('f-email').value = data.email;
-    }
-  } catch (e) {}
 
   $('admin-toggle-link').addEventListener('click', function(){
     $('admin-login').style.display = $('admin-login').style.display === 'none' ? 'block' : 'none';
