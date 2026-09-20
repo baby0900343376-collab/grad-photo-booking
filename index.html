@@ -179,7 +179,7 @@
 'use strict';
 
 // ⚠️ 部署 Apps Script 後，把下面換成你自己的「網頁應用程式」網址（結尾是 /exec）
-var API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+var API_URL = 'https://script.google.com/macros/s/AKfycbxvOUs_Eqw6fmdzNnBYfnyM64sATfOHFwJPcdy9LVaq_Tn7QxLVr7eXThIXQZwiOUrSFQ/exec';
 var BLOCKED_EMAIL_DOMAIN = '@gm.cyut.edu.tw';
 
 var appState = { dates: [] };
@@ -693,9 +693,9 @@ function init(){
 
   if (API_URL === 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'){
     showMessage('error', '尚未設定 API_URL：請部署 Apps Script 後，把網頁應用程式網址填進 index.html 最上面的 API_URL。');
+  } else {
+    loadState();
   }
-
-  loadState();
 
   try {
     var savedKey = localStorage.getItem('gpb_admin_key');
