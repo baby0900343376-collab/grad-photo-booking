@@ -69,6 +69,12 @@
   .field select:disabled, .field input:disabled{opacity:0.5; cursor:not-allowed;}
   .field select option{color:#1B2542; background:#ffffff;}
   .field select option:disabled{color:#9a9a9a;}
+  .admin-select{
+    width:100%; padding:11px 13px; border-radius:9px; border:1px solid var(--divider);
+    background:rgba(255,255,255,0.04); color:var(--ink-on-navy); font-size:0.94rem;
+    font-family:inherit; margin-bottom:12px;
+  }
+  .admin-select option{color:#1B2542; background:#ffffff;}
   .field input::placeholder{color:rgba(243,238,221,0.35);}
   .field input:focus, .field select:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
 
@@ -553,15 +559,7 @@ function renderAdminPanel(){
     section.appendChild(pickLabel);
 
     var bookingSelect = document.createElement('select');
-    bookingSelect.style.width = '100%';
-    bookingSelect.style.padding = '11px 13px';
-    bookingSelect.style.borderRadius = '9px';
-    bookingSelect.style.border = '1px solid var(--divider)';
-    bookingSelect.style.background = 'rgba(255,255,255,0.04)';
-    bookingSelect.style.color = 'var(--ink-on-navy)';
-    bookingSelect.style.marginBottom = '12px';
-    bookingSelect.style.fontFamily = 'inherit';
-    bookingSelect.style.fontSize = '0.94rem';
+    bookingSelect.className = 'admin-select';
 
     var sortedBookings = adminData.bookings.slice().sort(function(a, b){
       return a.dateId.localeCompare(b.dateId) || a.slotId.localeCompare(b.slotId);
